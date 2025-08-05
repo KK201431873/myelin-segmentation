@@ -91,7 +91,7 @@ There are two main Python files:
     python gratio_image_processor.py
     ```
 
-2. A GUI will appear with five buttons and a textbox—this is where instructions and logs will appear.
+2. A GUI will appear with five buttons and a logs textbox.
 
 #### Buttons Instructions
 
@@ -101,8 +101,8 @@ Click these buttons in order—
 - **Select Images**: Select the images you want to segment using these settings.
 - **Process Images**: Choose an output folder. A "STOP" button will appear to the right if you need to cancel the operation.
   - This generates `.pkl` files containing contours and measurements for each image.
-- **Review Output**: Select the `.pkl` files you want to review.
-  - _Note: This step just disables the contours; don't worry if you misclick._
+- **Review Output**: Select the `.pkl` files you want to review. Then, follow the instructions in the text box.
+  - _Note: Disabling a contour in the reviewer doesn't delete it on exit; don't worry if you misclick._
 - **Generate Data**: Select the `.pkl` files you want to generate a CSV file for. Then, choose an output folder to save your data to.
 
 ---
