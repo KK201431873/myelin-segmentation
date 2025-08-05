@@ -304,6 +304,7 @@ class ImageProcessorApp:
         parent_dir = os.path.dirname(csv_filepath)
         parent_dirname = os.path.basename(parent_dir)
 
+        print(f"Writing {str(os.path.basename(csv_filepath))}")
         csv_filename = os.path.basename(csv_filepath).split(".")[0]
         csv_dir = os.path.dirname(csv_filepath) + f"/{csv_filename}/"
         csv_filepath = csv_dir + os.path.basename(csv_filepath)
@@ -316,7 +317,7 @@ class ImageProcessorApp:
         os.makedirs(image_directory, exist_ok=True)
         for filename, image in out_imgs:
             out_img_path = f"{image_directory}/{filename}"
-            print(f"Writing {str(out_img_path)}")
+            print(f"Writing {str(filename)}")
             cv2.imwrite(str(out_img_path), image)
 
         generated_data_text = f"Generated in folder '{parent_dirname}/':"
