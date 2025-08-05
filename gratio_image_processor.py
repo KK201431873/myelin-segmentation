@@ -11,11 +11,13 @@ import pickle
 import threading
 import time
 from datetime import datetime
+from screeninfo import get_monitors
 
 CONFIG_DIR = "__program_config__"
 root_dir = Path(__file__).parent
 CONFIG_FILE = os.path.join(root_dir, CONFIG_DIR, "config_imgproc.json")
 os.makedirs(CONFIG_DIR, exist_ok=True)
+MONITOR = get_monitors()[0]
 
 class ImageProcessorApp:
     def __init__(self, root):
@@ -386,7 +388,7 @@ class ImageProcessorApp:
             (" = selected, ", None),
             ("RED", "red"),
             (" = deselected (excluded when generating dataset)\n", None),
-            ("|   CLICK a ", None),
+            ("|   CLICK near a ", None),
             ("BLACK", "black"),
             (" dot to select/deselect its contour\n", None),
             ("|   Hold SHIFT to hide ", None),
@@ -525,6 +527,8 @@ class ImageProcessorApp:
         area_correction_ratio = image_size / (3608 * 4096)
         linear_correction_ratio = math.sqrt(area_correction_ratio)
 
+        display_scale = 0.85*MONITOR.height/h
+
         preview_mode = False  # If True, hide excluded
         original_image_mode = False
 
@@ -561,6 +565,7 @@ class ImageProcessorApp:
                     selected_states[closest_ID] = not selected_states[closest_ID]
 
         cv2.namedWindow(window_title)
+        cv2.moveWindow(window_title, int(MONITOR.width/2-display_scale*w/2), 0)
         cv2.setMouseCallback(window_title, on_mouse)
 
         start_time = time.time()
