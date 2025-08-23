@@ -437,6 +437,7 @@ class ImageProcessorApp:
             filtered_contour_data = [d for d in contour_data if d[0] in included_ids]
             reindexed_contour_data = [tuple([i+1]+list(datum)[1:]) for i,datum in enumerate(filtered_contour_data)]
 
+            # draw contours
             for ID, inner_contour, outer_contour, g_ratio, circularity, thickness, inner_diameter, outer_diameter in reindexed_contour_data:
                 M = cv2.moments(inner_contour)
                 if M["m00"] != 0:
@@ -445,17 +446,26 @@ class ImageProcessorApp:
                 color = (0, 255, 0)
                 cv2.drawContours(out_img, [inner_contour], -1, color, 2)
                 cv2.drawContours(out_img, [outer_contour], -1, color, 2)
+            
+            # draw text
+            draw_scale = int(8*linear_correction_ratio)
+            line_spacing = 14*draw_scale
+            out_pil = Image.fromarray(cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB))
+            font = ImageFont.truetype("__assets__/JetBrainsMono-Bold.ttf", int(15*draw_scale))
+            draw = ImageDraw.Draw(out_pil)
             for ID, inner_contour, outer_contour, g_ratio, circularity, thickness, inner_diameter, outer_diameter in reindexed_contour_data:
                 M = cv2.moments(inner_contour)
-                draw_scale = int(8*linear_correction_ratio)
-                cx = int(M["m10"] / M["m00"]-15*draw_scale)
-                cy = int(M["m01"] / M["m00"]+6*draw_scale)
-                line_spacing = 6*draw_scale
-                cv2.putText(out_img, f"#{ID}", (cx, cy-line_spacing), 
-                            cv2.FONT_HERSHEY_PLAIN, draw_scale, (0, 0, 0), draw_scale, cv2.LINE_AA)
-                cv2.putText(out_img, f"{g_ratio:.2f}", (cx, cy+line_spacing), 
-                            cv2.FONT_HERSHEY_PLAIN, draw_scale, (255, 0, 0), draw_scale, cv2.LINE_AA)
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"]-6*draw_scale)
+
+                def draw_white_id_text(dx,dy):
+                    draw.text((int(cx-5*draw_scale*len(f"#{ID}"))+dx, cy-1/2*line_spacing+dy), f"#{ID}", font=font, fill=(255, 255, 255))
+                for dx,dy in [(-2,-2),(2,-2),(2,2),(-2,2)]:
+                    draw_white_id_text(dx,dy)
+                draw.text((int(cx-5*draw_scale*len(f"#{ID}")), cy-1/2*line_spacing), f"#{ID}", font=font, fill=(0, 0, 0))
+
                 data.append((ID, float(g_ratio), float(circularity), float(inner_diameter), float(outer_diameter), float(thickness)))
+            out_img = cv2.cvtColor(np.array(out_pil), cv2.COLOR_RGB2BGR)
             
             name, extension = img_filename.split(".")
             out_imgs.append((f"{name}_gratios_{formatted_datetime}.{extension}", out_img))
