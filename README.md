@@ -6,7 +6,7 @@ Python programs for automating myelinated axon segmentation in microscopy images
 
 ## Installation
 
-1. Clone this repository:
+1. Download or clone this repository. Run these commands if you are cloning using git:
 
     ```bash
     git clone https://github.com/KK201431873/myelin-segmentation.git
