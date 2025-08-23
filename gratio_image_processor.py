@@ -12,6 +12,7 @@ import threading
 import time
 from datetime import datetime
 from screeninfo import get_monitors
+from PIL import Image, ImageFont, ImageDraw
 
 CONFIG_DIR = "__program_config__"
 root_dir = Path(__file__).parent
@@ -129,8 +130,9 @@ class ImageProcessorApp:
             messagebox.showerror("Error", f"Failed to load settings:\n{e}")
 
     def read_settings(self, settings):
-        keys = ["thresh","radius","dilate","erode","min_size","max_size","convex_thresh","circ_thresh"]
+        keys = ["nm_per_pixel","thresh","radius","dilate","erode","min_size","max_size","convex_thresh","circ_thresh"]
         if all(key in settings for key in keys):
+            self.nm_per_pixel = settings["nm_per_pixel"]
             self.init_thresh = settings["thresh"]
             self.init_radius = settings["radius"]
             self.init_dilate = settings["dilate"]
@@ -202,9 +204,9 @@ class ImageProcessorApp:
             print(f"Processing {img_path}")
 
             # Read image
-            divisor = 3
+            self.img_resize_divisor = 3
             img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-            img = cv2.resize(img, None, fx=1/divisor, fy=1/divisor)
+            img = cv2.resize(img, None, fx=1/self.img_resize_divisor, fy=1/self.img_resize_divisor)
             if img is None:
                 print(f"Skipping unreadable file: {img_path}")
                 continue
@@ -461,8 +463,6 @@ class ImageProcessorApp:
             
 
         csv_lines = []
-        csv_lines.append(f"NOTE: All length measurements are in pixels.\n")
-        csv_lines.append("\n")
 
         csv_lines.append(f"Image,Axons found\n")
         for filename,data in data_lists:
@@ -472,7 +472,7 @@ class ImageProcessorApp:
 
         for filename,data in data_lists:
             csv_lines.append(f"{filename}\n")
-            csv_lines.append("Axon #,G-ratio,Circularity,Inner diameter,Outer diameter,Myelin Thickness\n")
+            csv_lines.append("Axon #,G-ratio,Circularity,Inner diameter (nm),Outer diameter (nm),Myelin Thickness (nm)\n")
             for axon_id, gratio, circularity, inner_dia, outer_dia, thickness in data:
                 csv_lines.append(f"{axon_id},{gratio:.4f},{circularity:.4f},{inner_dia:.4f},{outer_dia:.4f},{thickness:.4f}\n")
             csv_lines.append("\n")
@@ -535,6 +535,7 @@ class ImageProcessorApp:
 
         def draw():
             display_img = image.copy()
+            # draw contours
             for ID, cx, cy, inner_contour, outer_contour in render_data:
                 if (preview_mode and not selected_states[ID]) or original_image_mode:
                     continue  # Hide excluded in preview
@@ -542,10 +543,25 @@ class ImageProcessorApp:
                 cv2.drawContours(display_img, [inner_contour], -1, color, 2)
                 cv2.drawContours(display_img, [outer_contour], -1, color, 2)
                 cv2.circle(display_img, (cx, cy), 4, (0, 0, 0), -1)
-                draw_scale = int(8*linear_correction_ratio)
-                cx = int(cx-15*draw_scale)
-                cv2.putText(display_img, f"#{ID}", (cx, cy), 
-                            cv2.FONT_HERSHEY_PLAIN, draw_scale, (0, 0, 0), draw_scale, cv2.LINE_AA)
+
+            # draw text
+            draw_scale = int(8*linear_correction_ratio)
+            line_spacing = 14*draw_scale
+            out_pil = Image.fromarray(cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB))
+            font = ImageFont.truetype("__assets__/JetBrainsMono-Bold.ttf", int(15*draw_scale))
+            draw = ImageDraw.Draw(out_pil)
+            for ID, cx, cy, inner_contour, outer_contour in render_data:
+                if (preview_mode and not selected_states[ID]) or original_image_mode:
+                    continue
+                cy = int(cy-6*draw_scale)
+
+                def draw_white_id_text(dx,dy):
+                    draw.text((int(cx-5*draw_scale*len(f"#{ID}"))+dx, cy-1/2*line_spacing+dy), f"#{ID}", font=font, fill=(255, 255, 255))
+                for dx,dy in [(-2,-2),(2,-2),(2,2),(-2,2)]:
+                    draw_white_id_text(dx,dy)
+                draw.text((int(cx-5*draw_scale*len(f"#{ID}")), cy-1/2*line_spacing), f"#{ID}", font=font, fill=(0, 0, 0))
+                
+            display_img = cv2.cvtColor(np.array(out_pil), cv2.COLOR_RGB2BGR)
             resized = cv2.resize(display_img, (0, 0), fx=display_scale, fy=display_scale)
             return resized
 
@@ -821,8 +837,9 @@ class ImageProcessorApp:
             #     cv2.putText(out_img, f"{g_ratio:.2f}", (cx, cy+line_spacing), 
             #                 cv2.FONT_HERSHEY_PLAIN, draw_scale, (255, 0, 0), draw_scale, cv2.LINE_AA)
                 
-            inner_diameter = 2*radius
-            outer_diameter = inner_diameter + 2*thickness
+            inner_diameter = 2*radius*self.nm_per_pixel*self.img_resize_divisor
+            outer_diameter = inner_diameter + 2*thickness*self.nm_per_pixel*self.img_resize_divisor
+            thickness *= self.nm_per_pixel*self.img_resize_divisor
 
             inner_contour += np.array([[[x_min, y_min]]])
             outer_contour += np.array([[[x_min, y_min]]])

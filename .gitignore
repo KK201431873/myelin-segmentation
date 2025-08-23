@@ -1,4 +1,8 @@
 *
+
+!__assets__
+!__assets__/*
+
 !gratio_image_processor.py
 !gratio_tuner.py
 !.gitignore

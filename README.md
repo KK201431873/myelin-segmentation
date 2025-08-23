@@ -21,6 +21,11 @@ Python programs for automating myelinated axon segmentation in microscopy images
     pip install -r requirements.txt
     ```
 
+   If on newer versions, use:
+    ```bash
+    py -m pip install -r requirements.txt
+    ```
+
 ---
 
 ## How to Use
@@ -38,10 +43,16 @@ There are two main Python files:
     python gratio_tuner.py
     ```
 
+   If on newer versions, use:
+    ```bash
+    py gratio_tuner.py
+    ```
+
 2. Select the image you want to tune the algorithm to.
 
 3. Two windows will appear:
-   - A thresholded version of your image.
+   - A thresholded version of your image under a "nm per pixel" textbox.  
+      - Paste in the image's corresponding nm/pixel value and click the "Set" button.  
    - A control panel with several sliders.
 
 #### Adjusting the Sliders
@@ -70,11 +81,11 @@ There are two main Python files:
 
 #### Tuning Tips
 
-- It's better to have more false positives than false negatives. Therefore, it may be ideal to keep convexity and circularity at 0.
 - Start with all sliders at 0 except threshold. Tune threshold until the axon interiors are clearly isolated from the outside.
 - Radius might not be useful in detailed images.
 - Dilate and erode might not be useful in images that are crowded and detailed.
 - You may not need to adjust min/max size often.
+- It's better to have more false positives than false negatives. Therefore, it may be ideal to keep convexity and circularity at 0.
 
 #### Save Your Settings
 
@@ -91,11 +102,16 @@ There are two main Python files:
     python gratio_image_processor.py
     ```
 
+   If on newer versions, use:
+    ```bash
+    py gratio_image_processor.py
+    ```
+
 2. A GUI will appear with five buttons and a logs textbox.
 
 #### Buttons Instructions
 
-Click these buttons in order—
+Click these buttons in order:
 
 - **Select Settings**: Choose the JSON settings file you saved.
 - **Select Images**: Select the images you want to segment using these settings.

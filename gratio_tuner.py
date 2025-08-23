@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog, Tk
-from PIL import Image, ImageTk
+from tkinter import filedialog, Tk, messagebox
+from PIL import Image, ImageTk, ImageFont, ImageDraw
 import math
 import json
 import os
@@ -15,7 +15,8 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # Initial parameters
 def init_default_settings():
-    global init_thresh, init_radius, init_dilate, init_erode, init_min_size, init_max_size, init_convex_thresh, init_circ_thresh
+    global nm_per_pixel, init_thresh, init_radius, init_dilate, init_erode, init_min_size, init_max_size, init_convex_thresh, init_circ_thresh
+    nm_per_pixel = 1.0
     init_thresh = 127
     init_radius = 0
     init_dilate = 0
@@ -31,6 +32,7 @@ if os.path.exists(config_abs_path):
     with open(CONFIG_FILE, "r") as f:
         try:
             config = json.load(f)
+            nm_per_pixel = config["nm_per_pixel"]
             init_thresh = config["thresh"]
             init_radius = config["radius"]
             init_dilate = config["dilate"]
@@ -225,22 +227,36 @@ def process_image(input_image, thresh_val, radius_val, dilate, erode, min_size, 
 
         # Calculate circularity
         circularity = 4 * math.pi * cv2.contourArea(inner_contour[0]) / (contour_perimeter ** 2) if contour_perimeter != 0 else 0
+
+        inner_diameter = (2*radius)*nm_per_pixel*divisor
+        outer_diameter = inner_diameter + 2*thickness*nm_per_pixel*divisor
         
         # Draw contour and label thickness on output image
         cv2.drawContours(out_img, inner_contour + np.array([[[x_min, y_min]]]), -1, (0, 255, 0), draw_scale)
         cv2.drawContours(out_img, outer_contour + np.array([[[x_min, y_min]]]), -1, (0, 255, 0), draw_scale)
         M = cv2.moments(contour)
         if M["m00"] != 0:
-            cx = int(M["m10"] / M["m00"]-15*draw_scale)
-            cy = int(M["m01"] / M["m00"]+6*draw_scale)
-            line_spacing = 6*draw_scale
-            cv2.putText(out_img, f"#{i+1}", (cx, cy-line_spacing), 
-                        cv2.FONT_HERSHEY_PLAIN, draw_scale, (0, 0, 0), draw_scale, cv2.LINE_AA)
-            cv2.putText(out_img, f"{g_ratio:.2f}", (cx, cy+line_spacing), 
-                        cv2.FONT_HERSHEY_PLAIN, draw_scale, (255, 0, 0), draw_scale, cv2.LINE_AA)
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"]-6*draw_scale)
+            line_spacing = 14*draw_scale
+            out_pil = Image.fromarray(cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB))
+            font = ImageFont.truetype("__assets__/JetBrainsMono-Bold.ttf", int(15*draw_scale))
+            draw = ImageDraw.Draw(out_pil)
+
+            def draw_white_id_text(dx,dy):
+                draw.text((int(cx-5*draw_scale*len(f"#{i+1}"))+dx, cy-1/2*line_spacing+dy), f"#{i+1}", font=font, fill=(255, 255, 255))
+            for dx,dy in [(-2,-2),(2,-2),(2,2),(-2,2)]:
+                draw_white_id_text(dx,dy)
+            draw.text((int(cx-5*draw_scale*len(f"#{i+1}")), cy-1/2*line_spacing), f"#{i+1}", font=font, fill=(0, 0, 0))
+            inner_dia_text = f"ø{int(round(inner_diameter))}nm" if round(inner_diameter)<1000 else f"ø{inner_diameter/1000:.2f}μm"
+            def draw_white_inner_dia_text(dx,dy):
+                draw.text((int(cx-5*draw_scale*len(inner_dia_text)+dx), cy+1/2*line_spacing+dy), inner_dia_text, font=font, fill=(255, 255, 255))
+            for dx,dy in [(-2,-2),(2,-2),(2,2),(-2,2)]:
+                draw_white_inner_dia_text(dx,dy)
+            draw.text((int(cx-5*draw_scale*len(inner_dia_text)), cy+1/2*line_spacing), inner_dia_text, font=font, fill=(0, 0, 255))
+
+            out_img = cv2.cvtColor(np.array(out_pil), cv2.COLOR_RGB2BGR)
             
-        inner_diameter = 2*radius
-        outer_diameter = inner_diameter + 2*thickness
         data.append((i+1, float(g_ratio), float(circularity), float(inner_diameter), float(outer_diameter), float(thickness)))
         # print(f"myelin thickness {thickness} | axon radius {radius} | g_ratio {g_ratio}")
     
@@ -257,7 +273,7 @@ def select_image_file():
 
 # Callback for trackbar
 def update(val=0):
-    global root, label, tk_image
+    global root, label, tk_image, nm_per_pixel
     if not finished_setup or not root:
         return
     # Read all slider values
@@ -269,10 +285,16 @@ def update(val=0):
     max_size = cv2.getTrackbarPos("Max Size (K)", control_window)*1000
     convex_thresh = cv2.getTrackbarPos("Convexity %", control_window) / 100.0
     circ_thresh = cv2.getTrackbarPos("Circularity %", control_window) / 100.0
+    
+    # Try to read nm per pixel
+    try:
+        nm_per_pixel = float(entry.get())
+    except Exception:
+        messagebox.showerror("Error", f"Invalid nm per pixel")
 
     # Process and show
     out_img, _ = process_image(img_gray, thresh, radius, dilate, erode, min_size, max_size, convex_thresh, circ_thresh)
-    scale = 0.64
+    scale = 0.6
     out_img = cv2.resize(out_img, None, fx=scale, fy=scale)
     
     pil_image = Image.fromarray(cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB))
@@ -335,6 +357,7 @@ def save_config(filepath):
         try:
             with open(filepath, "w") as f:
                 settings = {
+                    "nm_per_pixel" : float(entry.get()),
                     "thresh" : cv2.getTrackbarPos("Threshold", control_window),
                     "radius" : cv2.getTrackbarPos("Radius", control_window),
                     "dilate" : cv2.getTrackbarPos("Dilate", control_window),
@@ -342,7 +365,7 @@ def save_config(filepath):
                     "min_size" : cv2.getTrackbarPos("Min Size (K)", control_window)*1000,
                     "max_size" : cv2.getTrackbarPos("Max Size (K)", control_window)*1000,
                     "convex_thresh" : cv2.getTrackbarPos("Convexity %", control_window) / 100.0,
-                    "circ_thresh" : cv2.getTrackbarPos("Circularity %", control_window) / 100.0,
+                    "circ_thresh" : cv2.getTrackbarPos("Circularity %", control_window) / 100.0
                 }
                 json.dump(settings, f, indent=4)
         except Exception as e:
@@ -358,6 +381,39 @@ root.title(image_window)
 root.protocol("WM_DELETE_WINDOW", close)
 root.bind("<Control-s>", user_save_config)
 root.bind("<Escape>", close)
+
+# Add textbox for nm per pixel
+frm = tk.Frame(root)
+frm.pack(pady=5)
+npp_string = str(nm_per_pixel)
+npp_label = tk.Label(frm, text="nm per pixel:")
+npp_label.pack(side="left")
+npp_var = tk.StringVar()
+npp_var.set(npp_string)
+
+def on_entry_change(*args):
+    if entry.get().strip()==npp_string:
+        npp_label.config(text="nm per pixel:")
+    else:
+        npp_label.config(text="*nm per pixel:")
+
+npp_var.trace_add("write", on_entry_change)
+entry = tk.Entry(frm, width=10, textvariable=npp_var)
+entry.pack(side="left")
+
+def notify_and_update():
+    global npp_string
+    try:
+        float(entry.get())
+        npp_string = entry.get().strip()
+        on_entry_change()
+        messagebox.showinfo("Value Set", f"Set value for nm per pixel.")
+        update()
+    except Exception:
+        messagebox.showerror("Error", f"Invalid value for nm per pixel.")
+tk.Button(frm, text="Set", command=notify_and_update).pack(side="left")
+
+# Add image display
 label = tk.Label(root)
 label.pack()
 
