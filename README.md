@@ -1,6 +1,6 @@
 # myelin-segmentation
 
-Python programs for automating myelinated axon segmentation in microscopy images.
+Python programs for partially automating myelinated axon segmentation in microscopy images.
 
 ---
 
